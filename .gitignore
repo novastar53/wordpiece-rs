@@ -1,0 +1,13 @@
+/target
+**/*.rs.bk
+*.pyo
+*.pyc
+__pycache__/
+.Python
+*.so
+*.dylib
+*.dll
+/python/venv/
+/dist/
+/build/
+*.egg-info/
