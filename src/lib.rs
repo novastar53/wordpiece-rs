@@ -6,9 +6,12 @@ use regex::Regex;
 
 #[derive(Default)]
 struct TrieNode {
-    children: HashMap<char, TrieNode>,
-    is_word: bool,
-    token_id: i32,
+    """
+    Define a TrieNode struct to represent a node in the Trie data structure.
+    """
+    children: HashMap<char, TrieNode>, // A map of child nodes, where each child node is represented by a character
+    is_word: bool, // Indicates whether the node represents the end of a word
+    token_id: i32, // The token ID associated with the word
 }
 
 impl TrieNode {
@@ -17,15 +20,21 @@ impl TrieNode {
     }
 
     fn insert(&mut self, word: &str, token_id: i32) {
+        """ 
+        Insert a word into the Trie.
+        """
         let mut node = self;
         for ch in word.chars() {
             node = node.children.entry(ch).or_insert_with(TrieNode::new);
-        }
-        node.is_word = true;
-        node.token_id = token_id;
+        } // Traverse the Trie by iterating over each character in the word
+        node.is_word = true; // Mark the last node as the end of a word
+        node.token_id = token_id; // Store the token ID associated with the word
     }
 
     fn find_longest_prefix(&self, word: &[char], start: usize) -> Option<(usize, i32)> {
+        """
+        Find the longest prefix of a word in the Trie.
+        """
         let mut node = self;
         let mut last_match = None;
         let mut pos = start;
