@@ -1,21 +1,19 @@
 mod trainer;
 
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList};
+use pyo3::types::PyDict;
 use std::collections::HashMap;
 use unicode_normalization::UnicodeNormalization;
 use regex::{Regex, RegexBuilder};
 use std::borrow::Cow;
 use trainer::WordPieceTrainer;
 
+/// A node in the trie data structure for efficient prefix matching
 #[derive(Default)]
 struct TrieNode {
-    """
-    Define a TrieNode struct to represent a node in the Trie data structure.
-    """
-    children: HashMap<char, TrieNode>, // A map of child nodes, where each child node is represented by a character
-    is_word: bool, // Indicates whether the node represents the end of a word
-    token_id: i32, // The token ID associated with the word
+    children: HashMap<char, TrieNode>,
+    is_word: bool,
+    token_id: i32,
 }
 
 impl TrieNode {
@@ -23,22 +21,18 @@ impl TrieNode {
         Self::default()
     }
 
+    /// Insert a word into the trie with its associated token ID
     fn insert(&mut self, word: &str, token_id: i32) {
-        """ 
-        Insert a word into the Trie.
-        """
         let mut node = self;
         for ch in word.chars() {
             node = node.children.entry(ch).or_insert_with(TrieNode::new);
-        } // Traverse the Trie by iterating over each character in the word
-        node.is_word = true; // Mark the last node as the end of a word
-        node.token_id = token_id; // Store the token ID associated with the word
+        }
+        node.is_word = true;
+        node.token_id = token_id;
     }
 
+    /// Find the longest prefix of a word in the trie, starting from a given position
     fn find_longest_prefix(&self, word: &[char], start: usize) -> Option<(usize, i32)> {
-        """
-        Find the longest prefix of a word in the Trie.
-        """
         let mut node = self;
         let mut last_match = None;
         let mut pos = start;
@@ -60,11 +54,27 @@ impl TrieNode {
 }
 
 /// Token represents a single token with its text, ID, and whether it's a special token
+#[pyclass]
 #[derive(Debug, Clone)]
 struct Token {
+    #[pyo3(get)]
     text: String,
+    #[pyo3(get)]
     id: i32,
+    #[pyo3(get)]
     is_special: bool,
+}
+
+#[pymethods]
+impl Token {
+    #[new]
+    fn new(text: String, id: i32, is_special: bool) -> Self {
+        Token {
+            text,
+            id,
+            is_special,
+        }
+    }
 }
 
 #[pyclass]
@@ -175,7 +185,7 @@ impl WordPieceTokenizer {
         let normalized = text.nfd().collect::<String>();
         let stripped = normalized
             .chars()
-            .filter(|&c| !char::is_mark(c))
+            .filter(|&c| !c.is_ascii_punctuation() && !c.is_ascii_control())
             .collect::<String>();
         Cow::Owned(stripped)
     }

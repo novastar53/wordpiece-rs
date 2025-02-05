@@ -86,7 +86,7 @@ impl WordPieceTrainer {
         }
 
         text.nfd()
-            .filter(|&c| !char::is_mark(c))
+            .filter(|&c| !c.is_ascii_punctuation() && !c.is_ascii_control())
             .collect::<String>()
     }
 
@@ -252,7 +252,7 @@ impl WordPieceTrainer {
             let count = pair_counts[&(first.clone(), second.clone())];
             
             symbols.insert(
-                merged,
+                merged.clone(),
                 Symbol::new(merged, count),
             );
         }
