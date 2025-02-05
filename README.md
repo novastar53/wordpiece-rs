@@ -2,7 +2,7 @@
 
 A fast implementation of the WordPiece tokenizer in Rust with Python bindings using PyO3.
 
-## Features
+## Key Features
 
 - Fast tokenization using Rust
 - Python bindings via PyO3
