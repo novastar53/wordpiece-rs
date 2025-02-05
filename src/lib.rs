@@ -4,10 +4,54 @@ use std::collections::HashMap;
 use unicode_normalization::UnicodeNormalization;
 use regex::Regex;
 
+#[derive(Default)]
+struct TrieNode {
+    children: HashMap<char, TrieNode>,
+    is_word: bool,
+    token_id: i32,
+}
+
+impl TrieNode {
+    fn new() -> Self {
+        Self::default()
+    }
+
+    fn insert(&mut self, word: &str, token_id: i32) {
+        let mut node = self;
+        for ch in word.chars() {
+            node = node.children.entry(ch).or_insert_with(TrieNode::new);
+        }
+        node.is_word = true;
+        node.token_id = token_id;
+    }
+
+    fn find_longest_prefix(&self, word: &[char], start: usize) -> Option<(usize, i32)> {
+        let mut node = self;
+        let mut last_match = None;
+        let mut pos = start;
+
+        while pos < word.len() {
+            if let Some(next) = node.children.get(&word[pos]) {
+                if next.is_word {
+                    last_match = Some((pos + 1, next.token_id));
+                }
+                node = next;
+                pos += 1;
+            } else {
+                break;
+            }
+        }
+
+        last_match
+    }
+}
+
 #[pyclass]
 struct WordPieceTokenizer {
-    vocab: HashMap<String, i32>,
+    trie: TrieNode,
+    vocab_lookup: HashMap<i32, String>,
     unk_token: String,
+    unk_token_id: i32,
     max_input_chars_per_word: usize,
 }
 
@@ -15,16 +59,26 @@ struct WordPieceTokenizer {
 impl WordPieceTokenizer {
     #[new]
     fn new(vocab: &PyDict, unk_token: Option<&str>, max_input_chars_per_word: Option<usize>) -> Self {
-        let mut vocab_map = HashMap::new();
+        let mut trie = TrieNode::new();
+        let mut vocab_lookup = HashMap::new();
+        let unk = unk_token.unwrap_or("[UNK]").to_string();
+        let mut unk_id = 0;
+
         for (k, v) in vocab.iter() {
             let key = k.extract::<String>().unwrap();
             let value = v.extract::<i32>().unwrap();
-            vocab_map.insert(key, value);
+            if key == unk {
+                unk_id = value;
+            }
+            trie.insert(&key, value);
+            vocab_lookup.insert(value, key);
         }
 
         WordPieceTokenizer {
-            vocab: vocab_map,
-            unk_token: unk_token.unwrap_or("[UNK]").to_string(),
+            trie,
+            vocab_lookup,
+            unk_token: unk,
+            unk_token_id: unk_id,
             max_input_chars_per_word: max_input_chars_per_word.unwrap_or(200),
         }
     }
@@ -41,36 +95,30 @@ impl WordPieceTokenizer {
                 continue;
             }
 
-            let mut is_bad = false;
             let mut start = 0;
             let mut sub_tokens = Vec::new();
+            let mut is_bad = false;
 
             while start < chars.len() {
-                let mut end = chars.len();
-                let mut cur_substr = None;
+                let prefix = if start == 0 {
+                    // For the first token, look in the trie directly
+                    self.trie.find_longest_prefix(&chars, 0)
+                } else {
+                    // For subsequent tokens, prepend "##" and look in the trie
+                    let mut prefix_chars = Vec::with_capacity(2 + chars.len() - start);
+                    prefix_chars.extend(['#', '#']);
+                    prefix_chars.extend(&chars[start..]);
+                    self.trie.find_longest_prefix(&prefix_chars, 0)
+                };
 
-                while start < end {
-                    let substr: String = chars[start..end].iter().collect();
-                    let substr_to_check = if start == 0 {
-                        substr.clone()
-                    } else {
-                        format!("##{}",substr)
-                    };
-
-                    if self.vocab.contains_key(&substr_to_check) {
-                        cur_substr = Some(substr_to_check);
-                        break;
-                    }
-                    end -= 1;
-                }
-
-                if cur_substr.is_none() {
+                if let Some((len, token_id)) = prefix {
+                    let token = self.vocab_lookup.get(&token_id).unwrap().clone();
+                    sub_tokens.push(token);
+                    start += if start == 0 { len } else { len - 2 };
+                } else {
                     is_bad = true;
                     break;
                 }
-
-                sub_tokens.push(cur_substr.unwrap());
-                start = end;
             }
 
             if is_bad {
@@ -84,28 +132,55 @@ impl WordPieceTokenizer {
     }
 
     fn encode(&self, text: &str) -> Vec<i32> {
-        self.tokenize(text)
-            .iter()
-            .map(|token| *self.vocab.get(token).unwrap_or(&-1))
-            .collect()
+        let re = Regex::new(r"[^\s]+").unwrap();
+        let text = text.nfkc().collect::<String>();
+        let mut output_ids = Vec::new();
+
+        for token in re.find_iter(&text) {
+            let chars: Vec<char> = token.as_str().chars().collect();
+            if chars.len() > self.max_input_chars_per_word {
+                output_ids.push(self.unk_token_id);
+                continue;
+            }
+
+            let mut start = 0;
+            let mut sub_tokens = Vec::new();
+            let mut is_bad = false;
+
+            while start < chars.len() {
+                let prefix = if start == 0 {
+                    self.trie.find_longest_prefix(&chars, 0)
+                } else {
+                    let mut prefix_chars = Vec::with_capacity(2 + chars.len() - start);
+                    prefix_chars.extend(['#', '#']);
+                    prefix_chars.extend(&chars[start..]);
+                    self.trie.find_longest_prefix(&prefix_chars, 0)
+                };
+
+                if let Some((len, token_id)) = prefix {
+                    sub_tokens.push(token_id);
+                    start += if start == 0 { len } else { len - 2 };
+                } else {
+                    is_bad = true;
+                    break;
+                }
+            }
+
+            if is_bad {
+                output_ids.push(self.unk_token_id);
+            } else {
+                output_ids.extend(sub_tokens);
+            }
+        }
+
+        output_ids
     }
 
     fn decode(&self, ids: Vec<i32>) -> String {
-        let tokens: Vec<String> = ids
-            .iter()
-            .filter_map(|&id| {
-                self.vocab
-                    .iter()
-                    .find(|(_, &v)| v == id)
-                    .map(|(k, _)| k.clone())
-            })
-            .collect();
-
-        tokens
-            .iter()
+        ids.iter()
+            .filter_map(|&id| self.vocab_lookup.get(&id))
             .map(|t| t.replace("##", ""))
-            .collect::<Vec<String>>()
-            .join("")
+            .collect::<String>()
     }
 }
 

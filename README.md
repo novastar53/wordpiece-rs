@@ -1,6 +1,14 @@
 # WordPiece Tokenizer in Rust
 
-A fast implementation of the WordPiece tokenizer in Rust with Python bindings using PyO3.
+A fast implementation of the WordPiece tokenizer in Rust with Python bindings using PyO3. This implementation uses a trie-based approach for O(n) time complexity, making it significantly faster than traditional O(n²) implementations.
+
+## Performance
+
+The tokenizer uses a trie data structure to efficiently find the longest matching subwords, resulting in:
+- O(n) time complexity for tokenization (vs O(n²) in naive implementations)
+- O(m) space complexity where m is the total size of the vocabulary
+- Fast prefix matching using a character-based trie
+- Efficient token ID lookup
 
 ## Key Features
 
