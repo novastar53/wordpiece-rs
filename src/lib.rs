@@ -1,9 +1,12 @@
+mod trainer;
+
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use std::collections::HashMap;
 use unicode_normalization::UnicodeNormalization;
 use regex::{Regex, RegexBuilder};
 use std::borrow::Cow;
+use trainer::WordPieceTrainer;
 
 #[derive(Default)]
 struct TrieNode {
@@ -335,6 +338,43 @@ impl WordPieceTokenizer {
         }
         
         result
+    }
+
+    #[staticmethod]
+    #[args(
+        vocab_size = "30000",
+        min_frequency = "2",
+        special_tokens = "None",
+        strip_accents = "true",
+        lowercase = "true"
+    )]
+    fn train(
+        texts: Vec<String>,
+        vocab_size: usize,
+        min_frequency: usize,
+        special_tokens: Option<Vec<String>>,
+        strip_accents: bool,
+        lowercase: bool,
+    ) -> PyResult<HashMap<String, i32>> {
+        let special_tokens = special_tokens.unwrap_or_else(|| {
+            vec![
+                "[UNK]".to_string(),
+                "[CLS]".to_string(),
+                "[SEP]".to_string(),
+                "[PAD]".to_string(),
+                "[MASK]".to_string(),
+            ]
+        });
+
+        let trainer = WordPieceTrainer::new(
+            vocab_size,
+            min_frequency,
+            special_tokens,
+            strip_accents,
+            lowercase,
+        );
+
+        Ok(trainer.train(&texts))
     }
 }
 
