@@ -75,6 +75,39 @@ tokenizer = wordpiece_rs.WordPieceTokenizer(
 )
 ```
 
+## Benchmarks
+
+This implementation uses a fast single-pass algorithm based on the paper "A Fast WordPiece Tokenization Algorithm" by Xinying Song et al. (2021). The algorithm achieves O(n) time complexity compared to O(n²) in traditional implementations.
+
+### Running Benchmarks
+
+1. Rust benchmarks (using Criterion.rs):
+```bash
+cargo bench
+```
+This will generate detailed HTML reports in `target/criterion/report/index.html`.
+
+2. Python benchmarks (comparison with HuggingFace):
+```bash
+pip install .[benchmark]
+python benchmarks/benchmark.py
+```
+This will generate a plot comparing performance with HuggingFace's implementation.
+
+### Performance Comparison
+
+The fast implementation shows significant improvements:
+- Linear time complexity (O(n)) vs quadratic (O(n²))
+- Faster tokenization, especially for long sequences
+- More memory efficient with trie-based storage
+- Single pass through input text
+
+Key optimizations:
+1. Trie with failure links (Aho-Corasick style)
+2. Early stopping with maximum length tracking
+3. Efficient prefix matching
+4. Memory-efficient data structures
+
 ## License
 
 MIT License
