@@ -177,7 +177,7 @@ impl WordPieceTokenizer {
         text
     }
 
-    fn strip_accents_if_needed(&self, text: &str) -> Cow<str> {
+    fn strip_accents_if_needed<'a>(&self, text: &'a str) -> Cow<'a, str> {
         if !self.strip_accents {
             return Cow::Borrowed(text);
         }
