@@ -93,6 +93,9 @@ jobs:
   pypi-publish:
     runs-on: ubuntu-latest
     needs: [linux, windows, macos, sdist]
+    permissions:
+      # Required for trusted publishing
+      id-token: write
     environment:
       name: pypi
       url: https://pypi.org/p/wordpiece_rs
@@ -107,4 +110,3 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/
-          password: ${{ secrets.PYPI_API_TOKEN }}  # Use API token for first release
