@@ -96,8 +96,6 @@ jobs:
     environment:
       name: pypi
       url: https://pypi.org/p/wordpiece_rs
-    permissions:
-      id-token: write
     steps:
       - name: Download all wheels
         uses: actions/download-artifact@v4
@@ -109,3 +107,4 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/
+          password: ${{ secrets.PYPI_API_TOKEN }}  # Use API token for first release
